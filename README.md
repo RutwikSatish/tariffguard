@@ -3,7 +3,7 @@ Supply Chain Tariff Impact & Margin Optimization Platform
 
 "The 2025 US tariff escalation — China +120pp, Vietnam +46pp, Mexico +25pp, Canada +25pp — is the largest disruption to US import costs in modern trade history. For supply chain teams, the question is no longer whether margins will shrink. It's how fast, and what to do."
 
-Live App →  |  GitHub →
+Live App → https://tariffguard.streamlit.app/ |  GitHub → https://github.com/RutwikSatish/tariffguard
 
 What It Does
 TariffGuard quantifies exactly how the 2025 US tariff schedule erodes product margins and annual revenue — then uses AI to recommend specific optimization strategies, sourcing alternatives, and pricing decisions.
