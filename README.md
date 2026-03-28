@@ -88,10 +88,7 @@ LOW — erosion < 5pp
 
 2025 Tariff Context
 
-Default rates loaded in the app (source: USTR announcements Jan–Apr 2025):
-CountryPrevious RateNew RateChangeChina25%145%+120ppVietnam0%46%+46ppTaiwan0%32%+32ppIndia0%26%+26ppMexico0%25%+25ppCanada0%25%+25ppSouth
-Korea0%25%+25ppJapan0%24%+24ppGermany0%20%+20ppBrazil0%10%+10pp
-
+Default rates loaded in the app (source: USTR announcements Jan–Apr 2025)
 All rates are editable directly in the sidebar — update as the tariff schedule evolves.
 
 Technology Stack
@@ -107,12 +104,12 @@ Why Groq instead of OpenAI / Anthropic?
 
   Free — no credit card, 14,400 API calls/day, 30/minute
   Fast — llama-3.1-8b-instant responds in 1–3 seconds
-  No data retention — Groq does not train on API inputs, important for commercial supply chain data
+  No data retention — Groq does not train on API inputs, which is important for commercial supply chain data
   Works on Streamlit Cloud without any secrets management complexity
 
 Installation
 bash# 1. Clone the repo
-git clone https://github.com/your-username/tariffguard
+git clone https://github.com/RutwikSatish/tariffguard
 cd tariffguard
 
 # 2. Create virtual environment
