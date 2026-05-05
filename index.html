@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TariffGuard — Tariff Exposure & Supplier Shift Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Fira+Code:wght@400;500;600&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper:   #EEF1F5;
+  --paper2:  #E4E8EF;
+  --paper3:  #D8DDE6;
+  --ink:     #0F1623;
+  --ink2:    #1C2333;
+  --steel:   #1E4A8C;
+  --steel2:  #2560B0;
+  --red:     #C0392B;
+  --muted:   #667080;
+  --soft:    #8A9AAE;
+  --border:  #C8D0DC;
+  --serif:   'Instrument Serif', Georgia, serif;
+  --mono:    'Fira Code', 'Courier New', monospace;
+  --sans:    'DM Sans', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  opacity: .4;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 2rem; position: relative; z-index: 1; }
+
+.label {
+  font-family: var(--mono); font-size: .60rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--steel);
+  display: inline-block; margin-bottom: .6rem;
+}
+
+/* NAV */
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(238,241,245,.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 2px solid var(--ink);
+  padding: .8rem 0;
+}
+.nav-inner { display: flex; align-items: center; justify-content: space-between; }
+.nav-logo-wrap { display: flex; align-items: center; gap: .7rem; }
+.nav-badge {
+  background: var(--ink); color: var(--paper);
+  font-family: var(--mono); font-size: .62rem; font-weight: 600;
+  padding: .25rem .6rem; letter-spacing: .06em;
+}
+.nav-wordmark { font-family: var(--serif); font-size: 1.05rem; color: var(--ink); font-style: italic; }
+.nav-links { display: flex; gap: 1.5rem; }
+.nav-links a {
+  font-family: var(--mono); font-size: .62rem; color: var(--muted);
+  text-decoration: none; letter-spacing: .08em; text-transform: uppercase; transition: color .2s;
+}
+.nav-links a:hover { color: var(--steel); }
+.btn-nav {
+  background: var(--steel); color: white;
+  font-family: var(--mono); font-size: .62rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .4rem 1rem; text-decoration: none; transition: background .2s;
+}
+.btn-nav:hover { background: var(--steel2); }
+
+/* HERO */
+.hero { padding: 5rem 0 3rem; }
+.hero-inner { display: grid; grid-template-columns: 1.1fr .9fr; gap: 4rem; align-items: start; }
+
+.hero-kicker {
+  font-family: var(--mono); font-size: .60rem; letter-spacing: .16em;
+  text-transform: uppercase; color: var(--steel);
+  display: flex; align-items: center; gap: .5rem; margin-bottom: 1.2rem;
+}
+.hero-kicker::before { content: ''; display: block; width: 24px; height: 1px; background: var(--steel); }
+
+.hero-h1 {
+  font-family: var(--serif); font-size: clamp(2.4rem, 4.5vw, 3.8rem);
+  font-weight: 400; line-height: 1.1; color: var(--ink);
+  margin-bottom: 1rem; letter-spacing: -.01em;
+}
+.hero-h1 em { font-style: italic; color: var(--steel); }
+
+.hero-deck {
+  font-size: .88rem; color: var(--muted); line-height: 1.75;
+  margin-bottom: 2rem; border-left: 3px solid var(--steel); padding-left: 1rem;
+}
+
+.hero-ctas { display: flex; gap: .8rem; flex-wrap: wrap; }
+.btn-primary {
+  background: var(--ink); color: var(--paper);
+  font-family: var(--mono); font-size: .68rem; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .65rem 1.4rem; text-decoration: none;
+  transition: background .2s, transform .15s;
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+.btn-primary:hover { background: var(--ink2); transform: translateY(-1px); }
+.btn-outline {
+  background: transparent; border: 1.5px solid var(--ink); color: var(--ink);
+  font-family: var(--mono); font-size: .68rem;
+  letter-spacing: .08em; text-transform: uppercase;
+  padding: .65rem 1.4rem; text-decoration: none;
+  transition: background .2s, color .2s;
+  display: inline-flex; align-items: center; gap: .4rem;
+}
+.btn-outline:hover { background: var(--ink); color: var(--paper); }
+
+/* EXPOSURE CARD */
+.exposure-card {
+  background: var(--paper2); border: 1.5px solid var(--ink);
+  overflow: hidden;
+  box-shadow: 4px 4px 0 var(--ink);
+  animation: floatCard 7s ease-in-out infinite;
+}
+@keyframes floatCard {
+  0%,100% { transform: rotate(-.3deg) translateY(0); }
+  50%      { transform: rotate(.3deg) translateY(-6px); }
+}
+.card-header {
+  background: var(--ink); color: var(--paper);
+  padding: .6rem 1rem; display: flex; align-items: center; justify-content: space-between;
+}
+.card-title { font-family: var(--mono); font-size: .65rem; letter-spacing: .1em; text-transform: uppercase; }
+.card-body { padding: 1.2rem; }
+
+.tariff-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: .5rem 0; border-bottom: 1px solid var(--border);
+  font-size: .78rem;
+}
+.tariff-row:last-child { border-bottom: none; }
+.country-name { font-family: var(--mono); color: var(--ink2); }
+.tariff-delta { font-family: var(--mono); font-weight: 600; }
+.delta-high  { color: var(--red); }
+.delta-med   { color: var(--steel); }
+.flag-badge {
+  font-family: var(--mono); font-size: .52rem; letter-spacing: .06em;
+  padding: 2px 6px; text-transform: uppercase;
+}
+.flag-red  { background: var(--red);   color: white; }
+.flag-blue { background: var(--steel); color: white; }
+
+.impact-banner {
+  margin-top: 1rem; background: var(--paper); border: 1px solid var(--border); padding: .8rem 1rem;
+}
+.impact-amount {
+  font-family: var(--serif); font-size: 1.8rem; font-style: italic;
+  color: var(--red); line-height: 1;
+}
+.impact-desc { font-size: .72rem; color: var(--muted); margin-top: .2rem; font-family: var(--mono); }
+
+/* RULE DIVIDER */
+.rule-divider {
+  display: flex; align-items: center; gap: 1rem;
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: .8rem 0; margin: 2rem 0;
+}
+.rule-divider span { font-family: var(--mono); font-size: .60rem; color: var(--muted); letter-spacing: .12em; text-transform: uppercase; }
+.rule-divider::before, .rule-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* SECTIONS */
+.section { padding: 3.5rem 0; }
+.section-title {
+  font-family: var(--serif); font-size: 2rem; font-weight: 400;
+  color: var(--ink); letter-spacing: -.01em; margin-top: .4rem; margin-bottom: 2rem;
+}
+
+/* SCENARIO GRID */
+.scenario-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--border); }
+.scenario-card { background: var(--paper); padding: 1.4rem; transition: background .2s; }
+.scenario-card:hover { background: var(--paper2); }
+.s-num { font-family: var(--mono); font-size: .58rem; color: var(--steel); letter-spacing: .12em; margin-bottom: .6rem; }
+.s-name { font-family: var(--serif); font-size: 1.05rem; color: var(--ink); margin-bottom: .4rem; font-style: italic; }
+.s-desc { font-size: .78rem; color: var(--muted); line-height: 1.6; }
+.s-tag {
+  display: inline-block; margin-top: .6rem;
+  font-family: var(--mono); font-size: .55rem; letter-spacing: .08em;
+  color: var(--steel); border: 1px solid var(--border); padding: 2px 7px;
+}
+
+/* CALLOUT */
+.callout {
+  background: var(--ink); color: var(--paper);
+  padding: 2.5rem; margin: 3rem 0;
+}
+.callout-hed {
+  font-family: var(--serif); font-size: 1.6rem; font-style: italic;
+  color: white; margin-bottom: 1rem; line-height: 1.2;
+}
+.callout-body { font-size: .85rem; color: rgba(238,241,245,.7); line-height: 1.7; max-width: 680px; }
+.callout-stat {
+  display: grid; grid-template-columns: repeat(3,1fr); gap: 1.5rem;
+  margin-top: 2rem; padding-top: 2rem; border-top: 1px solid rgba(255,255,255,.1);
+}
+.c-stat-val { font-family: var(--serif); font-size: 2rem; font-style: italic; color: #6FA8DC; line-height: 1; }
+.c-stat-lbl { font-family: var(--mono); font-size: .60rem; color: rgba(238,241,245,.5); letter-spacing: .08em; text-transform: uppercase; margin-top: .3rem; }
+
+/* CONSULTANT VERDICT */
+.verdict-block {
+  border: 1.5px solid var(--steel); padding: 1.6rem 1.8rem; margin: 2rem 0;
+  background: rgba(30,74,140,.04);
+}
+.verdict-label {
+  font-family: var(--mono); font-size: .60rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--steel); margin-bottom: .8rem;
+  display: flex; align-items: center; gap: .5rem;
+}
+.verdict-label::after { content: ''; flex: 1; height: 1px; background: var(--steel); opacity: .3; }
+.verdict-body { font-size: .85rem; line-height: 1.75; color: var(--ink2); }
+.verdict-body .ok   { background: rgba(39,174,96,.12); color: #1a7a45; font-family: var(--mono); font-size: .62rem; padding: 1px 7px; border: 1px solid rgba(39,174,96,.3); margin-right: 4px; }
+.verdict-body .warn { background: rgba(192,57,43,.10); color: var(--red); font-family: var(--mono); font-size: .62rem; padding: 1px 7px; border: 1px solid rgba(192,57,43,.25); margin-right: 4px; }
+.verdict-body strong { color: var(--ink); font-weight: 600; }
+
+/* SCENARIO TABLE */
+.s-table { width: 100%; border-collapse: collapse; font-size: .80rem; }
+.s-table th {
+  background: var(--ink); color: var(--paper);
+  font-family: var(--mono); font-size: .60rem; letter-spacing: .08em;
+  text-transform: uppercase; padding: .6rem .8rem; text-align: left;
+}
+.s-table td { padding: .65rem .8rem; border-bottom: 1px solid var(--border); color: var(--ink2); vertical-align: top; }
+.s-table tr:nth-child(even) td { background: var(--paper2); }
+.s-table code { font-family: var(--mono); font-size: .72rem; color: var(--steel); }
+.highlight-row td { background: rgba(30,74,140,.06) !important; }
+
+/* STACK */
+.chip-row { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: 1rem; }
+.chip {
+  font-family: var(--mono); font-size: .63rem; padding: 3px 10px;
+  border: 1px solid var(--border); color: var(--muted); background: var(--paper2);
+}
+.chip.ref { border-color: var(--steel); color: var(--steel); }
+
+/* AUTHOR */
+.author-block {
+  border-top: 2px solid var(--ink); padding: 2.5rem 0;
+  display: grid; grid-template-columns: 1fr auto; gap: 2rem; align-items: center;
+}
+.author-name { font-family: var(--serif); font-size: 1.2rem; font-style: italic; color: var(--ink); }
+.author-meta { font-family: var(--mono); font-size: .65rem; color: var(--muted); margin-top: .2rem; letter-spacing: .03em; }
+.author-btns { display: flex; gap: .5rem; }
+.a-btn {
+  font-family: var(--mono); font-size: .60rem; letter-spacing: .08em;
+  color: var(--muted); border: 1px solid var(--border); padding: .35rem .8rem;
+  text-decoration: none; transition: all .2s; text-transform: uppercase;
+}
+.a-btn:hover { border-color: var(--ink); color: var(--ink); }
+
+footer {
+  border-top: 1px solid var(--border); padding: 1.2rem 0;
+  font-family: var(--mono); font-size: .58rem; color: var(--soft);
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fadeUp .65s ease both; }
+.d1 { animation-delay: .08s; } .d2 { animation-delay: .16s; }
+.d3 { animation-delay: .24s; } .d4 { animation-delay: .32s; }
+
+@media (max-width: 800px) {
+  .hero-inner { grid-template-columns: 1fr; }
+  .scenario-grid { grid-template-columns: 1fr; }
+  .callout-stat { grid-template-columns: 1fr 1fr; }
+  .author-block { grid-template-columns: 1fr; }
+  .nav-links { display: none; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap nav-inner">
+    <div class="nav-logo-wrap">
+      <span class="nav-badge">TRADE</span>
+      <span class="nav-wordmark">TariffGuard</span>
+    </div>
+    <div class="nav-links">
+      <a href="#scenarios">Scenarios</a>
+      <a href="#model">Decision Model</a>
+      <a href="#stack">Stack</a>
+    </div>
+    <a href="https://tariffguard.streamlit.app" target="_blank" class="btn-nav">Launch App →</a>
+  </div>
+</nav>
+
+<section class="wrap hero">
+  <div class="hero-inner">
+    <div>
+      <div class="hero-kicker fade-up">Trade Analytics · April 2025 Tariff Event</div>
+      <h1 class="hero-h1 fade-up d1">
+        Which supplier do you<br>keep after <em>Liberation Day?</em>
+      </h1>
+      <p class="hero-deck fade-up d2">
+        TariffGuard quantifies the full cost of the 2025 US tariff escalation —
+        China +120pp, Vietnam +46pp, Mexico +25pp — per product, per country.
+        Then models three strategic responses with the transition cost math
+        every other tool ignores: PPAP re-qualification, bridge inventory, and production gap risk.
+      </p>
+      <div class="hero-ctas fade-up d3">
+        <a href="https://tariffguard.streamlit.app" target="_blank" class="btn-primary">↗ Open Live App</a>
+        <a href="https://github.com/rutwiksatish/tariffguard" target="_blank" class="btn-outline">⎇ View on GitHub</a>
+      </div>
+    </div>
+
+    <div class="exposure-card fade-up d4">
+      <div class="card-header">
+        <span class="card-title">2025 Tariff Schedule · US USTR</span>
+        <span style="font-family:var(--mono);font-size:.58rem;opacity:.6;">Liberation Day +120 days</span>
+      </div>
+      <div class="card-body">
+        <div class="tariff-row">
+          <span class="country-name">China</span>
+          <span><span class="tariff-delta delta-high">+120pp → 145%</span>&nbsp;<span class="flag-badge flag-red">Critical</span></span>
+        </div>
+        <div class="tariff-row">
+          <span class="country-name">Vietnam</span>
+          <span class="tariff-delta delta-high">+46pp → 46%</span>
+        </div>
+        <div class="tariff-row">
+          <span class="country-name">Mexico / Canada</span>
+          <span class="tariff-delta delta-med">+25pp → 25%</span>
+        </div>
+        <div class="tariff-row">
+          <span class="country-name">Taiwan</span>
+          <span class="tariff-delta delta-med">+32pp → 32%</span>
+        </div>
+        <div class="tariff-row">
+          <span class="country-name">India</span>
+          <span><span class="tariff-delta delta-med">+26pp → 26%</span>&nbsp;<span class="flag-badge flag-blue">Alt Source</span></span>
+        </div>
+        <div class="tariff-row">
+          <span class="country-name">Germany / Japan</span>
+          <span class="tariff-delta" style="color:var(--muted)">+20–24pp</span>
+        </div>
+        <div class="impact-banner">
+          <div class="impact-amount">3 SKUs</div>
+          <div class="impact-desc">go negative margin under 145% China tariffs<br>in the demo portfolio — replicating real 2025 conditions</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="rule-divider"><span>Absorb · Pass-Through · Supplier Switch · With Full Transition Costs</span></div>
+</div>
+
+<section class="section wrap" id="scenarios">
+  <p class="label">Three Strategic Responses</p>
+  <h2 class="section-title">The complete decision model.<br>Including what others ignore.</h2>
+  <div class="scenario-grid">
+    <div class="scenario-card">
+      <div class="s-num">Scenario A</div>
+      <div class="s-name">Partial Absorption</div>
+      <div class="s-desc">Company absorbs X% of the tariff increase, passes (100−X)% to customers via price increases. Configurable slider 0–100%. Reduces but doesn't eliminate margin erosion. Used when customer price sensitivity is low.</div>
+      <span class="s-tag">Gross margin retained model</span>
+    </div>
+    <div class="scenario-card">
+      <div class="s-num">Scenario B</div>
+      <div class="s-name">Full Pass-Through</div>
+      <div class="s-desc">Raises selling price to maintain current gross margin %. Includes 10% volume loss flag for products requiring >15% price increase — because elasticity matters. Maintains margin but risks customer churn.</div>
+      <span class="s-tag">Price-to-maintain formula</span>
+    </div>
+    <div class="scenario-card">
+      <div class="s-num">Scenario C</div>
+      <div class="s-name">Supplier Switch</div>
+      <div class="s-desc">Redirects HIGH-risk products to an alternative country (Mexico, India, Vietnam, etc.). Includes the full transition cost model: PPAP qualification cost × n products + bridge inventory carrying cost for the qualification window.</div>
+      <span class="s-tag">PPAP + bridge inventory math</span>
+    </div>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="callout">
+    <div class="callout-hed">Most tariff tools stop<br>at "switch to Country X, save $Y."</div>
+    <div class="callout-body">
+      The real decision is: if I switch from China to Mexico, my tariff drops from 145% to 25% —
+      but my unit cost rises 15%, I need 90 days for PPAP re-qualification at $28,000 per part,
+      and I need 3 months of bridge inventory to cover the qualification gap. What is my actual
+      net saving, and when do I break even? That's the math procurement teams need.
+      That's what TariffGuard computes.
+    </div>
+    <div class="callout-stat">
+      <div>
+        <div class="c-stat-val">+120pp</div>
+        <div class="c-stat-lbl">China tariff increase<br>April 2, 2025</div>
+      </div>
+      <div>
+        <div class="c-stat-val">90 days</div>
+        <div class="c-stat-lbl">Typical PPAP<br>re-qualification timeline</div>
+      </div>
+      <div>
+        <div class="c-stat-val">$50K</div>
+        <div class="c-stat-lbl">What a trade consultant<br>charges for this analysis</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="section wrap" id="model">
+  <p class="label">Decision Model Reference</p>
+  <h2 class="section-title">The math behind each scenario.</h2>
+  <table class="s-table">
+    <thead>
+      <tr>
+        <th>Model Component</th>
+        <th>Formula</th>
+        <th>Purpose</th>
+        <th>Note</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Unit cost after tariff</strong></td>
+        <td><code>cost_new = cost_base × (1 + tariff%)</code></td>
+        <td>Full landed cost</td>
+        <td>Transparent, auditable</td>
+      </tr>
+      <tr>
+        <td><strong>Margin erosion</strong></td>
+        <td><code>(margin_curr − margin_new) pp</code></td>
+        <td>Per-product risk scoring</td>
+        <td>Risk tier: HIGH ≥15pp erosion</td>
+      </tr>
+      <tr>
+        <td><strong>Price to maintain margin</strong></td>
+        <td><code>cost_new / (1 − current_margin_rate)</code></td>
+        <td>Pass-through scenario</td>
+        <td>Scenario B ceiling</td>
+      </tr>
+      <tr class="highlight-row">
+        <td><strong>PPAP transition cost</strong></td>
+        <td><code>PPAP_cost × n_products</code></td>
+        <td>Supplier switch one-time cost</td>
+        <td>Differentiator vs. other tools</td>
+      </tr>
+      <tr class="highlight-row">
+        <td><strong>Bridge inventory cost</strong></td>
+        <td><code>annual_rev × 1.5% × (ppap_days / 365)</code></td>
+        <td>Carrying cost during switch</td>
+        <td>Differentiator vs. other tools</td>
+      </tr>
+      <tr>
+        <td><strong>Break-even (months)</strong></td>
+        <td><code>total_transition / (gross_saving / 12)</code></td>
+        <td>Supplier switch viability</td>
+        <td>CFO decision threshold</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<div class="wrap">
+  <div class="verdict-block">
+    <div class="verdict-label">Consultant Verdict</div>
+    <div class="verdict-body">
+      <span class="ok">REAL PROBLEM</span> The April 2025 tariff escalation is a live, documented crisis event — not a hypothetical scenario. Mid-market manufacturers are making these decisions right now.<br><br>
+      <span class="ok">SOUND FRAMEWORK</span> The three-scenario model and PPAP + bridge inventory transition cost formula are the correct calculations for this procurement decision. This is what trade compliance consultants charge $50K to produce.<br><br>
+      <span class="warn">WATCH</span> The gross saving in Scenario C is a proxy estimate — it doesn't fully account for the cost premium compounding with the new tariff rate. Tighten before a CFO review.<br><br>
+      <span class="warn">SYNTHETIC DATA</span> Demo uses 10 fictional suppliers (SinoTech Ltd., CanSteel Corp., etc.) calibrated to realistic mid-market margins. Tariff rates are real USTR schedule. Frame as: <em>"Synthetic demo portfolio calibrated to real tariff conditions — CSV upload supported for live data."</em><br><br>
+      <strong>Resume framing:</strong> Lead with the PPAP transition cost model as the differentiator. "Built the decision math mid-market procurement teams are missing" — not just "built a tariff dashboard."
+    </div>
+  </div>
+</div>
+
+<section class="section wrap" id="stack">
+  <p class="label">Technical Stack</p>
+  <h2 class="section-title">Python · Streamlit · Plotly</h2>
+  <div class="chip-row">
+    <span class="chip">Python 3.11+</span>
+    <span class="chip">Streamlit</span>
+    <span class="chip">Pandas</span>
+    <span class="chip">Plotly</span>
+    <span class="chip">Groq · Llama 3.1 (free)</span>
+    <span class="chip">Requests</span>
+  </div>
+  <div class="chip-row">
+    <span class="chip ref">2025 USTR Tariff Schedule · Liberation Day</span>
+    <span class="chip ref">PPAP — Production Part Approval Process (AIAG)</span>
+    <span class="chip ref">Aberdeen Research · Supply Chain Cost Benchmarks</span>
+  </div>
+</section>
+
+<div class="wrap">
+  <div class="author-block">
+    <div>
+      <div class="author-name">Rutwik Satish</div>
+      <div class="author-meta">MS Engineering Management · Northeastern University · May 2026 · STEM OPT 36 months</div>
+    </div>
+    <div class="author-btns">
+      <a href="https://linkedin.com/in/rutwiksatish" target="_blank" class="a-btn">LinkedIn</a>
+      <a href="https://github.com/rutwiksatish" target="_blank" class="a-btn">GitHub</a>
+      <a href="mailto:satish.rutwik@gmail.com" class="a-btn">Email</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;width:100%;">
+    <span>TariffGuard · Tariff Exposure & Supplier Shift Simulator · 2025 USTR Schedule</span>
+    <span>© 2025 Rutwik Satish</span>
+  </div>
+</footer>
+
+</body>
+</html>
