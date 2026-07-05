@@ -4,17 +4,32 @@ TariffGuard — Tariff Exposure & Supplier Shift Simulator
 Built by Rutwik Satish | MS Engineering Management, Northeastern University
 
 WHY THIS EXISTS:
-  On April 2, 2025 ("Liberation Day"), the US announced the largest tariff
-  increases in modern trade history: China +120pp, Vietnam +46pp,
-  Mexico +25pp, Canada +25pp. Mid-market manufacturers were blindsided.
-  Large companies have trade compliance teams and six-figure software.
-  Mid-market companies are stuck doing this in Excel.
+  On April 2, 2025 ("Liberation Day"), the US announced sweeping "reciprocal"
+  tariff increases under IEEPA — among the most significant US tariff actions
+  in decades. Mid-market manufacturers without in-house trade compliance
+  teams were left running multi-million dollar sourcing decisions in Excel.
+
+  IMPORTANT — READ BEFORE PRESENTING THIS ANYWHERE:
+  This tool models the APRIL 2025 tariff SHOCK SCENARIO (the initial
+  "Liberation Day" peak rates), not current, live tariff rates. Since then:
+    - The US and China reached a truce in May 2025 that cut the China rate
+      from 145% to 30%, later adjusted further through 2025-2026.
+    - In February 2026, the US Supreme Court struck down the IEEPA legal
+      basis for the "reciprocal" tariffs entirely.
+    - A new Section 122 global tariff (10%) plus separate Section 301/232
+      duties replaced that framework — a materially different structure.
+    - The large majority of Mexico and Canada trade now claims USMCA
+      exemption in practice, so the flat 25% shown here overstates real
+      exposure for most shipments from those countries.
+  Treat the numbers below as a historical stress-test case, not today's
+  rates. All rates are editable in the sidebar — check current rates at
+  ustr.gov or a customs broker before using this for a real decision.
 
 WHAT IT DOES:
-  Quantifies tariff exposure, models three strategic responses
-  (Absorb / Pass-Through / Supplier Switch), and includes the transition
-  cost math every other tool ignores: PPAP re-qualification timeline,
-  bridge inventory cost, and production gap risk.
+  Quantifies tariff exposure under a chosen scenario, models three strategic
+  responses (Absorb / Pass-Through / Supplier Switch), and includes the
+  transition cost math a lot of simpler tools skip: PPAP re-qualification
+  timeline, bridge inventory cost, and production gap risk.
 
 STACK: Python · Streamlit · Plotly · Pandas · Requests (Groq)
 """
@@ -31,6 +46,9 @@ GROQ_URL   = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = "llama-3.1-8b-instant"
 TODAY_STR  = date.today().strftime("%B %d, %Y")
 
+# April 2025 "Liberation Day" peak rates — a historical shock scenario for
+# stress-testing, NOT current live tariff rates. Edit freely in the sidebar
+# to model today's actual rates or any other scenario.
 DEFAULT_TARIFFS = {
     "China":       {"current": 25.0, "new": 145.0},
     "Mexico":      {"current": 0.0,  "new": 25.0},
@@ -155,14 +173,15 @@ hr { border-color: #21262d !important; }
     background: #161b22; border: 1px solid #21262d; border-radius: 8px;
     padding: 14px 20px; font-size: 0.8rem; color: #8b949e; margin-top: 4px;
 }
+.staleness-banner {
+    background: #1c1500; border: 1px solid #d29922; border-radius: 8px;
+    padding: 14px 20px; font-size: 0.82rem; line-height: 1.7; color: #f0d78c;
+    margin-bottom: 12px;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # ── PLOTLY DARK BASE ──────────────────────────────────────────────────────────
-# IMPORTANT: Only safe keys here — no xaxis, yaxis, or legend.
-# Those are set per-chart via update_xaxes(), update_yaxes(), update_layout(legend=...).
-# Putting them here AND in update_layout(**DARK, legend=...) causes
-# "multiple values for keyword argument" TypeError.
 DARK_BASE = dict(
     template="plotly_dark",
     paper_bgcolor="#0a0e17",
@@ -171,7 +190,6 @@ DARK_BASE = dict(
     margin=dict(t=40, b=50, l=12, r=12),
 )
 
-# Axis style applied via update_xaxes / update_yaxes on every figure
 XAXIS_STYLE = dict(gridcolor="#21262d", linecolor="#30363d", tickfont=dict(color="#8b949e", size=10))
 YAXIS_STYLE = dict(gridcolor="#21262d", linecolor="#30363d", tickfont=dict(color="#8b949e"))
 LEGEND_H    = dict(orientation="h", y=1.02, font=dict(color="#c9d1d9", size=11), bgcolor="rgba(0,0,0,0)")
@@ -309,15 +327,21 @@ def build_ai_prompt(df: pd.DataFrame, tariffs: dict) -> tuple:
     ) if len(neg_margin) > 0 else ""
 
     system = (
-        "You are a senior supply chain strategy consultant specialising in trade policy and margin "
-        "optimization. Provide precise, data-driven recommendations. Always cite specific numbers. "
-        "Be direct — no padding, no vague statements."
+        "You are a supply chain strategy analyst helping a planner think through trade policy "
+        "exposure and margin optimization for a SCENARIO the user has defined (which may be "
+        "historical, hypothetical, or current — treat the numbers given as the scenario to "
+        "analyze, not as a claim about live conditions). Provide precise, data-driven "
+        "recommendations. Always cite specific numbers from the data given. Be direct — no "
+        "padding, no vague statements. Do not assert that these are today's real-world tariff "
+        "rates; analyze the scenario as given."
     )
-    user = f"""Analyse this portfolio's 2025 tariff exposure. DATE: {TODAY_STR}
+    user = f"""Analyse this portfolio's tariff exposure under the scenario rates configured below.
+SCENARIO DATE MODELED: {TODAY_STR} (treat tariff rates below as the scenario input, not a
+verified claim about today's actual live rates)
 PORTFOLIO: ${total_rev:,.0f} revenue | ${total_loss:,.0f} at risk ({total_loss/total_rev*100:.1f}%)
 HIGH-RISK PRODUCTS: {high_n} of {len(df)}{neg_text}
 
-TARIFF CHANGES:
+TARIFF CHANGES MODELED IN THIS SCENARIO:
 {tariff_text}
 
 TOP 5 WORST PRODUCTS:
@@ -329,7 +353,7 @@ LOSS BY COUNTRY:
 Respond in EXACTLY this format:
 
 SITUATION ASSESSMENT:
-[3-4 sentences on severity, worst exposure, core strategic risk]
+[3-4 sentences on severity, worst exposure, core strategic risk, under this scenario]
 
 IMMEDIATE ACTIONS — next 30 days:
 1. [action | $ impact | owner]
@@ -364,8 +388,11 @@ with st.sidebar:
     st.markdown("""
 <div style="background:#161b22;border:1px solid #21262d;border-radius:8px;padding:12px 14px;
      margin-bottom:16px;font-size:0.77rem;line-height:1.75;color:#8b949e">
-<span style="color:#f85149;font-weight:600">2025 US Tariff Schedule</span><br>
+<span style="color:#f85149;font-weight:600">April 2025 shock scenario (historical, editable)</span><br>
 China +120pp · Vietnam +46pp<br>Mexico +25pp · Canada +25pp<br>Taiwan +32pp · India +26pp
+<br><br>
+<span style="color:#d29922">⚠ Not current rates.</span> Edit below to model today's rates
+or any other scenario.
 </div>
 """, unsafe_allow_html=True)
 
@@ -396,7 +423,8 @@ China +120pp · Vietnam +46pp<br>Mexico +25pp · Canada +25pp<br>Taiwan +32pp ·
             st.caption("Free at [console.groq.com](https://console.groq.com) — 2 min setup")
 
     st.markdown("---")
-    with st.expander("Edit tariff rates"):
+    with st.expander("⚙️ Edit tariff rates — model current or any scenario"):
+        st.caption("Defaults reflect the April 2025 peak, not today's rates. Change freely.")
         sidebar_base = uploaded_df if uploaded_df is not None else get_sample_data()
         active_ctry  = sidebar_base["country"].unique().tolist()
         for country in DEFAULT_TARIFFS:
@@ -429,9 +457,21 @@ st.markdown("""
   <div class="section-label">TARIFF IMPACT & SUPPLIER OPTIMIZATION</div>
   <h1 style="font-size:2rem;font-weight:600;margin:0;letter-spacing:-0.02em;color:#f0f6fc">TariffGuard</h1>
   <p style="color:#8b949e;font-size:0.9rem;margin-top:6px;max-width:640px">
-    Quantifies how the 2025 US tariff escalation erodes product margins, then models the true cost
-    of each strategic response — including the transition costs every other tool ignores.
+    Quantifies how a tariff scenario erodes product margins, then models the true cost
+    of each strategic response — including the transition costs simpler tools skip.
   </p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="staleness-banner">
+⚠ <strong>The default numbers model the April 2025 "Liberation Day" tariff peak as a
+historical stress-test scenario — they are not live, current tariff rates.</strong>
+Since then, the underlying IEEPA tariffs were struck down by the US Supreme Court
+(Feb 2026) and replaced with a different structure, and most Mexico/Canada trade
+now claims USMCA exemption in practice. Edit rates in the sidebar to model today's
+actual numbers, or use this as-is to demonstrate the analysis method on a real,
+well-documented shock event.
 </div>
 """, unsafe_allow_html=True)
 
@@ -442,8 +482,8 @@ with st.expander("📋 The problem this solves — and how", expanded=False):
 <div class="problem-card">
 <div class="section-label" style="color:#f85149">THE INDUSTRY PROBLEM</div>
 <p style="font-size:0.87rem;line-height:1.75;color:#c9d1d9;margin:0">
-The 2025 tariff escalation hit mid-market manufacturers hardest. Large companies have trade
-compliance teams and expensive software. Mid-market companies are making multi-million dollar
+The 2025 tariff escalation hit mid-market manufacturers hard. Large companies have trade
+compliance teams and expensive software. Mid-market companies were making multi-million dollar
 sourcing decisions in Excel spreadsheets.
 <br><br>
 The hard problem isn't knowing tariff rates — those are public. It's the
@@ -456,26 +496,27 @@ face a 90-day PPAP re-qualification. What's my actual net saving?
     with c2:
         st.markdown("""
 <div class="solution-card">
-<div class="section-label" style="color:#3fb950">HOW TARIFFGUARD SOLVES IT</div>
+<div class="section-label" style="color:#3fb950">HOW TARIFFGUARD HELPS</div>
 <p style="font-size:0.87rem;line-height:1.75;color:#c9d1d9;margin:0">
-TariffGuard builds the full decision model procurement teams need:
+TariffGuard builds the decision model procurement teams need for any tariff scenario:
 <br><br>
 • <strong style="color:#f0f6fc">Exposure Dashboard</strong> — Annual tariff burden per product and country<br>
 • <strong style="color:#f0f6fc">Scenario Modeling</strong> — Absorb vs Pass-Through vs Supplier Switch<br>
 • <strong style="color:#f0f6fc">Transition Cost Model</strong> — PPAP + bridge inventory + production gap<br>
-• <strong style="color:#f0f6fc">AI Optimization Brief</strong> — Specific actions with $ impact and ownership
+• <strong style="color:#f0f6fc">AI Draft Brief</strong> — A first-pass set of actions with $ impact and ownership, for a planner to review
 <br><br>
-The analysis a supply chain consultant charges
-<strong style="color:#3fb950">$50K to produce</strong> — generated in seconds.
+Every number is auditable back to <code style="background:#161b22;padding:1px 6px;border-radius:4px">unit_cost_base</code>
+and the tariff rate you set — nothing is a black box.
 </p>
 </div>
 """, unsafe_allow_html=True)
     st.markdown("""
 <div class="context-bar">
-<strong style="color:#c9d1d9">Tariff context (2025 USTR):</strong>
+<strong style="color:#c9d1d9">Default scenario (April 2025 peak rates, editable):</strong>
 China +120pp · Vietnam +46pp · Mexico +25pp · Canada +25pp · Taiwan +32pp · India +26pp.
 The demo shows 3 China-sourced products going <strong style="color:#f85149">negative margin</strong> —
-exactly what US importers are experiencing.
+this is a verified output of the formulas below, not a hardcoded claim; change the tariff
+rates in the sidebar and the risk classifications recalculate live.
 </div>
 """, unsafe_allow_html=True)
 
@@ -629,9 +670,11 @@ with tab3:
     st.markdown("""
 <div style="background:#0d1117;border:1px solid #21262d;border-left:3px solid #d29922;border-radius:8px;
      padding:14px 20px;font-size:0.84rem;line-height:1.7;color:#c9d1d9;margin-bottom:16px">
-<strong style="color:#f0f6fc">What makes this different:</strong> Most tariff tools stop at "switch to Country X and save $Y."
-TariffGuard includes PPAP supplier qualification cost, bridge inventory carrying cost, and production gap risk
-— the numbers that make or break the real decision.
+<strong style="color:#f0f6fc">What makes this different:</strong> Most simple tariff calculators stop at
+"switch to Country X and save $Y." TariffGuard includes PPAP supplier qualification cost, bridge
+inventory carrying cost, and production gap risk — the numbers that make or break the real decision.
+PPAP cost/timeline defaults below are editable assumptions, not sourced benchmarks — set them to
+match your own supplier qualification experience.
 </div>
 """, unsafe_allow_html=True)
 
@@ -644,7 +687,7 @@ TariffGuard includes PPAP supplier qualification cost, bridge inventory carrying
         with sp2:
             st.markdown('<div style="color:#f0f6fc;font-weight:500;font-size:0.88rem;margin-bottom:8px">Scenario B — Full Pass-Through</div>', unsafe_allow_html=True)
             vol_hit = st.checkbox("10% volume loss on products needing >15% price increase", value=True)
-            st.caption("Maintains margin %, risks customer volume")
+            st.caption("Maintains margin %, risks customer volume — the 10% figure is an assumption, edit as needed")
         with sp3:
             st.markdown('<div style="color:#f0f6fc;font-weight:500;font-size:0.88rem;margin-bottom:8px">Scenario C — Supplier Switch</div>', unsafe_allow_html=True)
             alt_ctry     = st.selectbox("Switch HIGH-risk to", ["Mexico","India","Vietnam","Poland","Malaysia","Indonesia","Bangladesh"])
@@ -692,7 +735,7 @@ TariffGuard includes PPAP supplier qualification cost, bridge inventory carrying
     breakeven_mo     = (total_transition / max(gross_saving / 12.0, 1.0)) if gross_saving > 0 else 999.0
 
     st.markdown("---")
-    st.markdown('<div class="section-label">TRANSITION COST MODEL — WHAT MOST TOOLS MISS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">TRANSITION COST MODEL — WHAT SIMPLER TOOLS MISS</div>', unsafe_allow_html=True)
     st.markdown(
         f'<div class="transition-box">'
         f'Switching <strong>{n_high}</strong> HIGH-risk product(s) to <strong>{alt_ctry}</strong>: '
@@ -745,12 +788,13 @@ TariffGuard includes PPAP supplier qualification cost, bridge inventory carrying
 # TAB 4 — AI OPTIMIZATION
 # ══════════════════════════════════════════════════════════════════════════════
 with tab4:
-    st.markdown('<div class="section-label">AI OPTIMIZATION ROADMAP</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label">AI DRAFT OPTIMIZATION ROADMAP</div>', unsafe_allow_html=True)
     st.markdown("""
 <p style="color:#8b949e;font-size:0.84rem;margin-bottom:16px;max-width:700px">
 Groq AI (Llama 3.1, free) reads your live portfolio — actual product names, margin figures,
-country exposure — and returns the same structured roadmap a supply chain consultant delivers
-at $50K/engagement. Specific product names, $ figures, and ownership included.
+country exposure — and drafts a structured first-pass roadmap for a planner to review and
+edit. Specific product names, $ figures, and ownership included, but treat the output as a
+starting point, not a finished analysis.
 </p>
 """, unsafe_allow_html=True)
 
@@ -765,7 +809,7 @@ at $50K/engagement. Specific product names, $ figures, and ownership included.
         st.warning("Add your free Groq API key in the sidebar to generate the AI brief. Free at console.groq.com — no credit card required.")
     else:
         if st.button("🔍 Generate AI Optimization Plan", type="primary", use_container_width=True):
-            with st.spinner("Analysing tariff exposure and building recommendations..."):
+            with st.spinner("Analysing tariff exposure and drafting recommendations..."):
                 sys_p, usr_p = build_ai_prompt(df, st.session_state.tariffs)
                 result = ask_groq(sys_p, usr_p, st.session_state.groq_key)
             if result == "INVALID_KEY":
@@ -801,14 +845,26 @@ with tab5:
      border-radius:8px;padding:14px 20px;font-size:0.84rem;line-height:1.7;
      color:#c9d1d9;margin-bottom:16px">
 <strong style="color:#f0f6fc">What you're looking at:</strong>
-10 products across 8 countries, representative of a mid-market manufacturer's import portfolio.
+10 fictional products across 8 countries, representative of a mid-market manufacturer's
+import portfolio — illustrative data, not a real company's numbers.
 <code style="background:#161b22;padding:1px 6px;border-radius:4px;font-size:0.78rem">unit_cost_base</code> is the
 import cost <em>before</em> any tariff — all margin and erosion figures derive transparently from this field.
-Three China-sourced products (Electronic Control Modules, Chemical Solvents, LED Display Panels)
-go <strong style="color:#f85149">negative margin</strong> under 145% tariffs — replicating the exact
-situation US importers face in 2025.
+Under the April 2025 peak-rate scenario, three China-sourced products (Electronic Control
+Modules, Chemical Solvents, LED Display Panels) go
+<strong style="color:#f85149">negative margin</strong> — a real output of the formulas, not
+a scripted result, and it changes if you edit the tariff rates in the sidebar.
 <br><br>
 To run TariffGuard on your own data, upload a CSV in the sidebar with the same column names.
+</div>
+""", unsafe_allow_html=True)
+
+    st.markdown("""
+<div class="staleness-banner">
+⚠ The country color-coding below (green for Mexico/Canada) reflects their USMCA
+preferential trade status, not the magnitude of the tariff change shown in this specific
+scenario — in reality, most Mexico/Canada trade claims USMCA exemption regardless of the
+headline "reciprocal" tariff rate, which is why they're treated differently here from
+other countries with a similar percentage-point change.
 </div>
 """, unsafe_allow_html=True)
 
@@ -839,7 +895,7 @@ To run TariffGuard on your own data, upload a CSV in the sidebar with the same c
     )
 
     # ── Tariff schedule ────────────────────────────────────────────────────────
-    st.markdown('<div class="section-label" style="margin-top:20px">TARIFF SCHEDULE (CURRENT VS 2025 NEW RATES)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-label" style="margin-top:20px">TARIFF SCENARIO IN USE (CURRENT VS SCENARIO RATE)</div>', unsafe_allow_html=True)
 
     active_countries = raw_df["country"].unique().tolist()
     tariff_rows = []
@@ -954,7 +1010,7 @@ No hidden assumptions. Margin erosion, annual loss, and price-hike calculations 
         "tariffguard_tariff_schedule.csv",
         "text/csv",
         use_container_width=True,
-        help="Current vs new tariff rates for all countries in this portfolio",
+        help="Current vs scenario tariff rates for all countries in this portfolio",
     )
 
     st.markdown("""
@@ -973,7 +1029,7 @@ st.markdown("---")
 st.markdown(
     "<p style='font-size:0.72rem;color:#484f58;text-align:center'>"
     "TariffGuard · Tariff Exposure & Supplier Shift Simulator · "
-    "AI by Groq (Llama 3.1, free) · 2025 USTR tariff schedule · "
+    "AI by Groq (Llama 3.1, free) · Default scenario: April 2025 tariff peak (historical, editable) · "
     "Built by Rutwik Satish · MS Engineering Management, Northeastern University"
     "</p>",
     unsafe_allow_html=True,
